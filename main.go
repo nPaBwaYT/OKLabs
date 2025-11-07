@@ -8,7 +8,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/nPaBwaYT/crypta"
+	"OKLabs/cripta"
 )
 
 /*
@@ -34,19 +34,17 @@ go run main.go -e -a=des -m=cbc -p=ansi input.txt output.enc
 */
 
 func main() {
-	// Определяем флаги
 	encryptFlag := flag.Bool("e", false, "Режим шифрования")
 	decryptFlag := flag.Bool("d", false, "Режим дешифрования")
 	algorithmFlag := flag.String("a", "des", "Алгоритм шифрования: des, deal128, deal192, deal256")
 	modeFlag := flag.String("m", "cbc", "Режим шифрования: ecb, cbc, pcbc, cfb, ofb, ctr, random")
 	paddingFlag := flag.String("p", "pkcs7", "Режим набивки: zeros, pkcs7, ansi, iso")
 	parallelFlag := flag.Bool("parallel", false, "Использовать параллельную обработку (только для ECB/CTR)")
-	keyFlag := flag.String("k", "", "Ключ шифрования в hex (если не указан, будет сгенерирован)")
-	ivFlag := flag.String("iv", "", "Вектор инициализации в hex (если не указан, будет сгенерирован)")
+	keyFlag := flag.String("k", "", "Ключ шифрования в hex")
+	ivFlag := flag.String("iv", "", "Вектор инициализации в hex")
 
 	flag.Parse()
 
-	// Проверяем аргументы
 	if (*encryptFlag && *decryptFlag) || (!*encryptFlag && !*decryptFlag) {
 		fmt.Println("Использование:")
 		fmt.Println("  Шифрование: go run main.go -e -a=des -m=cbc input.txt output.enc")
@@ -65,40 +63,38 @@ func main() {
 	inputFile := args[0]
 	outputFile := args[1]
 
-	// Проверяем существование входного файла
 	if _, err := os.Stat(inputFile); os.IsNotExist(err) {
 		log.Fatalf("Ошибка: входной файл '%s' не существует", inputFile)
 	}
 
-	// Выбираем алгоритм
 	cipher, keyLength, err := createCipher(*algorithmFlag)
 	if err != nil {
 		log.Fatalf("Ошибка создания шифра: %v", err)
 	}
 
-	// Генерируем или парсим ключ
+	blockSize := 8
+	if *algorithmFlag != "des" {
+		blockSize = 16
+	}
+
 	key, err := getOrGenerateKey(*keyFlag, keyLength)
 	if err != nil {
 		log.Fatalf("Ошибка работы с ключом: %v", err)
 	}
 
-	// Преобразуем режимы
 	cipherMode := parseCipherMode(*modeFlag)
 	paddingMode := parsePaddingMode(*paddingFlag)
 
-	// Генерируем или парсим IV
-	iv, err := getOrGenerateIV(*ivFlag, 8) // 8 байт для DES/DEAL
+	iv, err := getOrGenerateIV(*ivFlag, blockSize, cipherMode)
 	if err != nil {
 		log.Fatalf("Ошибка работы с IV: %v", err)
 	}
 
-	// Создаем контекст шифрования
-	ctx, err := cripta.NewCipherContext(cipher, key, cipherMode, paddingMode, iv, 8)
+	ctx, err := cripta.NewCipherContext(cipher, key, cipherMode, paddingMode, iv, blockSize, *parallelFlag)
 	if err != nil {
 		log.Fatalf("Ошибка создания контекста шифрования: %v", err)
 	}
 
-	// Выполняем операцию
 	startTime := time.Now()
 
 	if *encryptFlag {
@@ -115,7 +111,6 @@ func main() {
 		fmt.Printf("Файл успешно дешифрован: %s -> %s\n", inputFile, outputFile)
 	}
 
-	// Выводим информацию
 	duration := time.Since(startTime)
 	fileInfo, _ := os.Stat(inputFile)
 	fileSize := fileInfo.Size()
@@ -133,7 +128,6 @@ func main() {
 	}
 }
 
-// createCipher создает экземпляр шифра в зависимости от алгоритма
 func createCipher(algorithm string) (cripta.ISymmetricCipher, int, error) {
 	switch algorithm {
 	case "des":
@@ -153,14 +147,11 @@ func createCipher(algorithm string) (cripta.ISymmetricCipher, int, error) {
 	}
 }
 
-// getOrGenerateKey возвращает ключ из флага или генерирует новый
 func getOrGenerateKey(keyFlag string, keyLength int) ([]byte, error) {
 	if keyFlag != "" {
-		// Парсим ключ из hex
 		return parseHexString(keyFlag, keyLength)
 	}
 	
-	// Генерируем случайный ключ
 	key := make([]byte, keyLength)
 	_, err := cripta.GenerateRandomBytes(key)
 	if err != nil {
@@ -169,14 +160,15 @@ func getOrGenerateKey(keyFlag string, keyLength int) ([]byte, error) {
 	return key, nil
 }
 
-// getOrGenerateIV возвращает IV из флага или генерирует новый
-func getOrGenerateIV(ivFlag string, ivLength int) ([]byte, error) {
+func getOrGenerateIV(ivFlag string, ivLength int, mode cripta.CipherMode) ([]byte, error) {
 	if ivFlag != "" {
-		// Парсим IV из hex
 		return parseHexString(ivFlag, ivLength)
 	}
 	
-	// Генерируем случайный IV
+	if mode == cripta.CipherModeECB {
+		return nil, nil
+	}
+	
 	iv := make([]byte, ivLength)
 	_, err := cripta.GenerateRandomBytes(iv)
 	if err != nil {
@@ -185,17 +177,12 @@ func getOrGenerateIV(ivFlag string, ivLength int) ([]byte, error) {
 	return iv, nil
 }
 
-// parseHexString парсит hex строку в байты
 func parseHexString(hexStr string, expectedLength int) ([]byte, error) {
-	// Простая реализация - в реальном приложении нужно использовать hex.DecodeString
-	// Здесь для простоты генерируем байты из строки
-	// Декодируем hex строку
 	data, err := hex.DecodeString(hexStr)
 	if err != nil {
 		return nil, fmt.Errorf("неверный hex формат: %w", err)
 	}
 
-	// Проверяем длину
 	if len(data) != expectedLength {
 		return nil, fmt.Errorf("неверная длина: ожидается %d байт, получено %d", expectedLength, len(data))
 	}
@@ -203,7 +190,6 @@ func parseHexString(hexStr string, expectedLength int) ([]byte, error) {
 	return data, nil
 }
 
-// parseCipherMode преобразует строку в CipherMode
 func parseCipherMode(mode string) cripta.CipherMode {
 	switch mode {
 	case "ecb":
@@ -225,7 +211,6 @@ func parseCipherMode(mode string) cripta.CipherMode {
 	}
 }
 
-// parsePaddingMode преобразует строку в PaddingMode
 func parsePaddingMode(padding string) cripta.PaddingMode {
 	switch padding {
 	case "zeros":
@@ -241,63 +226,44 @@ func parsePaddingMode(padding string) cripta.PaddingMode {
 	}
 }
 
-// encryptFile шифрует файл
 func encryptFile(ctx *cripta.CipherContext, inputPath, outputPath string, parallel bool) error {
-	if parallel && (ctx.GetMode() == cripta.CipherModeECB || ctx.GetMode() == cripta.CipherModeCTR) {
-		// Для параллельных режимов читаем файл и используем EncryptSync
-		data, err := os.ReadFile(inputPath)
-		if err != nil {
-			return fmt.Errorf("ошибка чтения файла: %w", err)
-		}
-		
-		encrypted, err := ctx.EncryptSync(data)
-		if err != nil {
-			return fmt.Errorf("ошибка шифрования: %w", err)
-		}
-		
-		err = os.WriteFile(outputPath, encrypted, 0644)
-		if err != nil {
-			return fmt.Errorf("ошибка записи файла: %w", err)
-		}
-	} else {
-		// Для последовательных режимов используем EncryptFile
-		err := ctx.EncryptFile(inputPath, outputPath)
-		if err != nil {
-			return fmt.Errorf("ошибка шифрования файла: %w", err)
-		}
+	data, err := os.ReadFile(inputPath)
+	if err != nil {
+		return fmt.Errorf("ошибка чтения файла: %w", err)
 	}
+	
+	canUseParallel := parallel && (ctx.GetMode() == cripta.CipherModeECB || ctx.GetMode() == cripta.CipherModeCTR)
+	
+	encrypted, err := ctx.Encrypt(data, canUseParallel)
+	if err != nil {
+		return fmt.Errorf("ошибка шифрования: %w", err)
+	}
+	
+	err = os.WriteFile(outputPath, encrypted, 0644)
+	if err != nil {
+		return fmt.Errorf("ошибка записи файла: %w", err)
+	}
+	
 	return nil
 }
 
-// decryptFile дешифрует файл
 func decryptFile(ctx *cripta.CipherContext, inputPath, outputPath string, parallel bool) error {
-	if parallel && (ctx.GetMode() == cripta.CipherModeECB || ctx.GetMode() == cripta.CipherModeCTR) {
-		// Для параллельных режимов читаем файл и используем DecryptSync
-		data, err := os.ReadFile(inputPath)
-		if err != nil {
-			return fmt.Errorf("ошибка чтения файла: %w", err)
-		}
-		
-		decrypted, err := ctx.DecryptSync(data)
-		if err != nil {
-			return fmt.Errorf("ошибка дешифрования: %w", err)
-		}
-		
-		err = os.WriteFile(outputPath, decrypted, 0644)
-		if err != nil {
-			return fmt.Errorf("ошибка записи файла: %w", err)
-		}
-	} else {
-		// Для последовательных режимов используем DecryptFile
-		err := ctx.DecryptFile(inputPath, outputPath)
-		if err != nil {
-			return fmt.Errorf("ошибка дешифрования файла: %w", err)
-		}
+	data, err := os.ReadFile(inputPath)
+	if err != nil {
+		return fmt.Errorf("ошибка чтения файла: %w", err)
 	}
+	
+	canUseParallel := parallel && (ctx.GetMode() == cripta.CipherModeECB || ctx.GetMode() == cripta.CipherModeCTR)
+	
+	decrypted, err := ctx.Decrypt(data, canUseParallel)
+	if err != nil {
+		return fmt.Errorf("ошибка дешифрования: %w", err)
+	}
+	
+	err = os.WriteFile(outputPath, decrypted, 0644)
+	if err != nil {
+		return fmt.Errorf("ошибка записи файла: %w", err)
+	}
+	
 	return nil
 }
-
-// Дополнительные методы для CipherContext (нужно добавить в cripta package)
-// В файле cipher_context.go добавьте:
-
-// GetMode возвращает текущий режим шифрования
