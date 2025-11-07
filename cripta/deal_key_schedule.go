@@ -44,11 +44,7 @@ func (dks *DEALKeySchedule) GenerateRoundKeys(masterKey []uint8) ([][]uint8, err
 		}
 		block := make([]uint8, 8)
 		copy(block, masterKey[i:end])
-		if len(block) < 8 {
-			padded := make([]uint8, 8)
-			copy(padded, block)
-			block = padded
-		}
+		
 		keyBlocks = append(keyBlocks, block)
 	}
 

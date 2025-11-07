@@ -66,28 +66,6 @@ func (deal *DEALCipher) EncryptBlock(plainBlock []uint8) ([]uint8, error) {
         return nil, fmt.Errorf("DEAL block must be 16 bytes (128 bits), got %d", len(plainBlock))
     }
 
-    // Если блок больше 16 байт, обрабатываем по частям
-    if len(plainBlock) > 16 {
-        result := make([]uint8, 0, len(plainBlock))
-        for i := 0; i < len(plainBlock); i += 16 {
-            end := i + 16
-            if end > len(plainBlock) {
-                end = len(plainBlock)
-            }
-            block := plainBlock[i:end]
-            if len(block) < 16 {
-                // Дополняем последний блок если нужно
-                block = append(block, make([]uint8, 16-len(block))...)
-            }
-            encrypted, err := deal.feistel.EncryptBlock(block)
-            if err != nil {
-                return nil, err
-            }
-            result = append(result, encrypted...)
-        }
-        return result, nil
-    }
-
     cipherBlock, err := deal.feistel.EncryptBlock(plainBlock)
     if err != nil {
         return nil, fmt.Errorf("feistel encryption failed: %w", err)

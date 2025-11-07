@@ -67,7 +67,7 @@ func main() {
 		log.Fatalf("Ошибка: входной файл '%s' не существует", inputFile)
 	}
 
-	cipher, keyLength, err := createCipher(*algorithmFlag)
+	cipher, keyLength, err := CreateCipher(*algorithmFlag)
 	if err != nil {
 		log.Fatalf("Ошибка создания шифра: %v", err)
 	}
@@ -98,13 +98,13 @@ func main() {
 	startTime := time.Now()
 
 	if *encryptFlag {
-		err = encryptFile(ctx, inputFile, outputFile, *parallelFlag)
+		err = encryptFile(ctx, inputFile, outputFile)
 		if err != nil {
 			log.Fatalf("Ошибка шифрования: %v", err)
 		}
 		fmt.Printf("Файл успешно зашифрован: %s -> %s\n", inputFile, outputFile)
 	} else {
-		err = decryptFile(ctx, inputFile, outputFile, *parallelFlag)
+		err = decryptFile(ctx, inputFile, outputFile)
 		if err != nil {
 			log.Fatalf("Ошибка дешифрования: %v", err)
 		}
@@ -128,7 +128,7 @@ func main() {
 	}
 }
 
-func createCipher(algorithm string) (cripta.ISymmetricCipher, int, error) {
+func CreateCipher(algorithm string) (cripta.ISymmetricCipher, int, error) {
 	switch algorithm {
 	case "des":
 		cipher, err := cripta.NewDESCipher()
@@ -226,15 +226,13 @@ func parsePaddingMode(padding string) cripta.PaddingMode {
 	}
 }
 
-func encryptFile(ctx *cripta.CipherContext, inputPath, outputPath string, parallel bool) error {
+func encryptFile(ctx *cripta.CipherContext, inputPath, outputPath string) error {
 	data, err := os.ReadFile(inputPath)
 	if err != nil {
 		return fmt.Errorf("ошибка чтения файла: %w", err)
 	}
 	
-	canUseParallel := parallel && (ctx.GetMode() == cripta.CipherModeECB || ctx.GetMode() == cripta.CipherModeCTR)
-	
-	encrypted, err := ctx.Encrypt(data, canUseParallel)
+	encrypted, err := ctx.Encrypt(data)
 	if err != nil {
 		return fmt.Errorf("ошибка шифрования: %w", err)
 	}
@@ -247,15 +245,13 @@ func encryptFile(ctx *cripta.CipherContext, inputPath, outputPath string, parall
 	return nil
 }
 
-func decryptFile(ctx *cripta.CipherContext, inputPath, outputPath string, parallel bool) error {
+func decryptFile(ctx *cripta.CipherContext, inputPath, outputPath string) error {
 	data, err := os.ReadFile(inputPath)
 	if err != nil {
 		return fmt.Errorf("ошибка чтения файла: %w", err)
 	}
 	
-	canUseParallel := parallel && (ctx.GetMode() == cripta.CipherModeECB || ctx.GetMode() == cripta.CipherModeCTR)
-	
-	decrypted, err := ctx.Decrypt(data, canUseParallel)
+	decrypted, err := ctx.Decrypt(data)
 	if err != nil {
 		return fmt.Errorf("ошибка дешифрования: %w", err)
 	}

@@ -3,7 +3,6 @@ package cripta
 import (
 	"crypto/rand"
 	"fmt"
-	"os"
 	"runtime"
 	"sync"
 )
@@ -46,8 +45,7 @@ func NewCipherContext(
 	paddingMode PaddingMode,
 	iv []uint8,
 	blockSize int,
-	parallel bool,
-) (*CipherContext, error) {
+	parallel bool) (*CipherContext, error) {
 
 	if cipher == nil {
 		return nil, fmt.Errorf("cipher implementation cannot be nil")
@@ -108,6 +106,7 @@ func (ctx *CipherContext) applyPadding(data []uint8) ([]uint8, error) {
 
 	dataLength := len(data)
 	paddingLength := ctx.blockSize - (dataLength % ctx.blockSize)
+	fmt.Println("\nPadding added, size:", paddingLength)
 	if paddingLength == 0 {
 		paddingLength = ctx.blockSize
 	}
@@ -117,7 +116,7 @@ func (ctx *CipherContext) applyPadding(data []uint8) ([]uint8, error) {
 
 	switch ctx.paddingMode {
 	case PaddingModeZeros:
-		// Уже скопировали данные, остальная часть автоматически нули
+		break
 
 	case PaddingModePKCS7:
 		for i := dataLength; i < len(padded); i++ {
@@ -154,6 +153,7 @@ func (ctx *CipherContext) removePadding(data []uint8) ([]uint8, error) {
 	}
 
 	paddingLength := int(data[len(data)-1])
+	fmt.Println("Padding size to remove:", paddingLength)
 
 	if paddingLength <= 0 || paddingLength > ctx.blockSize || paddingLength > len(data) {
 		return data, nil
@@ -370,7 +370,7 @@ func (ctx *CipherContext) decryptCTRParallel(ciphertext []uint8) ([]uint8, error
 	return ctx.encryptCTRParallel(ciphertext)
 }
 
-func (ctx *CipherContext) Encrypt(plaintext []uint8, parallel bool) ([]uint8, error) {
+func (ctx *CipherContext) Encrypt(plaintext []uint8) ([]uint8, error) {
 	if plaintext == nil {
 		return nil, fmt.Errorf("plaintext cannot be nil")
 	}
@@ -380,9 +380,9 @@ func (ctx *CipherContext) Encrypt(plaintext []uint8, parallel bool) ([]uint8, er
 		return nil, fmt.Errorf("padding failed: %w", err)
 	}
 
-	if ctx.mode == CipherModeECB && parallel {
+	if ctx.mode == CipherModeECB && ctx.parallel {
 		return ctx.encryptECBParallel(padded)
-	} else if ctx.mode == CipherModeCTR && parallel {
+	} else if ctx.mode == CipherModeCTR && ctx.parallel {
 		return ctx.encryptCTRParallel(padded)
 	}
 
@@ -477,19 +477,19 @@ func (ctx *CipherContext) Encrypt(plaintext []uint8, parallel bool) ([]uint8, er
 	return ciphertext, nil
 }
 
-func (ctx *CipherContext) Decrypt(ciphertext []uint8, parallel bool) ([]uint8, error) {
+func (ctx *CipherContext) Decrypt(ciphertext []uint8) ([]uint8, error) {
 	if ciphertext == nil {
 		return nil, fmt.Errorf("ciphertext cannot be nil")
 	}
 
-	if ctx.mode == CipherModeECB && parallel {
+	if ctx.mode == CipherModeECB && ctx.parallel {
 		plaintext, err := ctx.decryptECBParallel(ciphertext)
 		if err != nil {
 			return nil, err
 		}
 		return ctx.removePadding(plaintext)
-	} else if ctx.mode == CipherModeCTR && parallel {
-		plaintext, err := ctx.encryptCTRParallel(ciphertext)
+	} else if ctx.mode == CipherModeCTR && ctx.parallel {
+		plaintext, err := ctx.decryptCTRParallel(ciphertext)
 		if err != nil {
 			return nil, err
 		}
@@ -599,44 +599,6 @@ func (ctx *CipherContext) Decrypt(ciphertext []uint8, parallel bool) ([]uint8, e
 	}
 
 	return ctx.removePadding(plaintext)
-}
-
-func (ctx *CipherContext) EncryptFile(inputPath string, outputPath string) error {
-	data, err := os.ReadFile(inputPath)
-	if err != nil {
-		return fmt.Errorf("failed to read input file: %w", err)
-	}
-
-	encrypted, err := ctx.Encrypt(data, ctx.parallel)
-	if err != nil {
-		return fmt.Errorf("encryption failed: %w", err)
-	}
-
-	err = os.WriteFile(outputPath, encrypted, 0644)
-	if err != nil {
-		return fmt.Errorf("failed to write output file: %w", err)
-	}
-
-	return nil
-}
-
-func (ctx *CipherContext) DecryptFile(inputPath string, outputPath string) error {
-	data, err := os.ReadFile(inputPath)
-	if err != nil {
-		return fmt.Errorf("failed to read input file: %w", err)
-	}
-
-	decrypted, err := ctx.Decrypt(data, ctx.parallel)
-	if err != nil {
-		return fmt.Errorf("decryption failed: %w", err)
-	}
-
-	err = os.WriteFile(outputPath, decrypted, 0644)
-	if err != nil {
-		return fmt.Errorf("failed to write output file: %w", err)
-	}
-
-	return nil
 }
 
 func (ctx *CipherContext) SetKey(newKey []uint8) error {

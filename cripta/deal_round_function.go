@@ -57,9 +57,5 @@ func (drf *DEALRoundFunction) Apply(inputBlock []uint8, roundKey []uint8) ([]uin
 		return nil, fmt.Errorf("DES encryption failed: %w", err)
 	}
 
-	if len(output) != 8 {
-		return nil, fmt.Errorf("DES output size is incorrect: got %d bytes, expected 8", len(output))
-	}
-
 	return output, nil
 }
