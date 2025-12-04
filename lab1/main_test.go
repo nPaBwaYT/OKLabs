@@ -46,9 +46,9 @@ func Test(t *testing.T) {
 	}
 
 	testFiles := []string{
-		"./files/text.txt",    // Малый файл
-		"./files/photo.jpg",   // Средний файл  
-		"./files/video.mp4",   // Большой файл (только параллельные режимы)
+		"../files/text.txt",    // Малый файл
+		"../files/photo.jpg",   // Средний файл  
+		"../files/video.mp4",   // Большой файл (только параллельные режимы)
 	}
 
 	var existingFiles []string
@@ -378,7 +378,7 @@ func analyzeErrors(results []TestResult) {
 }
 
 func checkDirectories() error {
-	dirs := []string{"./files", "./encrypted_files", "./decrypted_files"}
+	dirs := []string{"../files", "../encrypted_files", "../decrypted_files"}
 	for _, dir := range dirs {
 		if _, err := os.Stat(dir); os.IsNotExist(err) {
 			return fmt.Errorf("директория %s не существует", dir)
