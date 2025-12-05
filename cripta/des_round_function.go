@@ -155,7 +155,7 @@ func (drf *DESRoundFunction) Apply(inputBlock []uint8, roundKey []uint8) ([]uint
 
 	expanded, err := PermuteBits(inputBlock, E_TABLE, false, 1)
 	if err != nil {
-		return nil, fmt.Errorf("E expansion failed: %w", err)
+		return nil, fmt.Errorf("e expansion failed: %w", err)
 	}
 
 	xored := make([]uint8, 6)
@@ -165,12 +165,12 @@ func (drf *DESRoundFunction) Apply(inputBlock []uint8, roundKey []uint8) ([]uint
 
 	sboxOutput, err := drf.applySBoxes(xored)
 	if err != nil {
-		return nil, fmt.Errorf("S-boxes application failed: %w", err)
+		return nil, fmt.Errorf("s-boxes application failed: %w", err)
 	}
 
 	result, err := PermuteBits(sboxOutput, P_TABLE, false, 1)
 	if err != nil {
-		return nil, fmt.Errorf("P permutation failed: %w", err)
+		return nil, fmt.Errorf("p permutation failed: %w", err)
 	}
 
 	return result, nil
